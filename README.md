@@ -1,2 +1,2 @@
 # eventbot
-Telegram bot to organize events in a group chat
+A Telegram bot to organize events in a group chat
