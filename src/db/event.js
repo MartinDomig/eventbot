@@ -1,6 +1,8 @@
 'use strict';
 
 const moment = require('moment');
+const Person = require('./person');
+const PersonArray = require('./persons');
 
 var Event = function(db) {
     this.db = db.db;
@@ -23,12 +25,13 @@ Event.prototype.createTable = function() {
 Event.prototype.create = function(event) {
   return new Promise((resolve, reject) => {
     var sql = 'INSERT INTO Event (creator, name, date, deadline, chatId) VALUES(?, ?, ?, ?, ?)';
-    this.db.run(sql, [event.creator, event.name, event.date, event.deadline, event.chatId], function(err, result) {
+    this.db.run(sql, [JSON.stringify(event.creator), event.name, event.date, event.deadline, event.chatId], function(err, result) {
       if(err) {
         console.log('error saving event', err);
         reject(err);
         return;
       }
+      event.participants = [];
       resolve(this.lastID);
     });
   });
@@ -42,6 +45,12 @@ Event.prototype.get = function(id) {
         reject(err);
         return;
       }
+      if(!row) {
+        reject('Event does not exist');
+        return;
+      }
+      row.creator = new Person(row.creator);
+      row.participants = PersonArray(row.participants);
       resolve(row);
     });
   });
@@ -64,29 +73,30 @@ Event.prototype.addParticipant = function(id, participant) {
   return new Promise((resolve, reject) => {
     this.get(id).then((row) => {
       if(row.deadline < moment()) {
-        console.log(participant, 'tried to register for', row.name, 'after deadline');
+        console.log(participant.handle(), 'tried to register for', row.name, 'after deadline');
         resolve({ reply: true, event: row, text: 'Registration for ' + row.name + ' is closed, @' + participant});
         return;
       }
-      var p = row.participants ? row.participants.split('/') : [];
+
+      var p = row.participants;
       for(var i = 0; i < p.length; i++) {
-        if(p[i] == participant) {
-          console.log(participant, 'registered for', row.name, 'AGAIN');
-          resolve({ reply: false, event: row, text: 'You are already registered for ' + row.name });
+        if(p[i].equals(participant)) {
+          console.log(participant.handle(), 'registered for', row.name, 'AGAIN');
+          resolve({ reply: false, event: row, text: 'You are already registered for ' + row.name + ', ' + participant.handle() });
           return;
         }
       }
       p.push(participant);
 
       var sql = 'UPDATE Event SET participants = ? WHERE _id = ?';
-      this.db.run(sql, [p.join('/'), id], (err) => {
+      this.db.run(sql, [JSON.stringify(p), id], (err) => {
         if(err) {
           console.log(err);
           reject(err);
           return;
         }
-        console.log(participant, 'registered for', row.name);
-        resolve({ reply: true, event: row, text: '@' + participant + ' registered for ' + row.name });
+        console.log(participant.handle(), 'registered for', row.name);
+        resolve({ reply: true, event: row, text: participant.handle() + ' registered for ' + row.name });
       });
     });
   });
@@ -96,29 +106,35 @@ Event.prototype.removeParticipant = function(id, participant) {
   return new Promise((resolve, reject) => {
     this.get(id).then((row) => {
       if(row.deadline < moment()) {
-        console.log(participant, 'tried to deregister from', row.name, 'after deadline');
-        resolve({ reply: true, event: row, text: 'Registration for ' + row.name + ' is closed, @' + participant });
+        console.log(participant.handle(), 'tried to deregister from', row.name, 'after deadline');
+        resolve({ reply: true, event: row, text: 'Registration for ' + row.name + ' is closed, ' + participant.handle() });
         return;
       }
 
-      var p = row.participants ? row.participants.split('/') : [];
-      var i = p.indexOf(participant);
-      if(i < 0) {
-        console.log(participant, 'deregistered from', row.name, 'AGAIN');
-        resolve({ reply: true, event: row, text: 'You were not registered for ' + row.name + ', @' + participant });
+      var p = row.participants;
+      var index = -1;
+      for(var i = 0; i < p.length; i++) {
+        if(p[i].equals(participant)) {
+          index = i;
+          break;
+        }
+      }
+      if(index < 0) {
+        console.log(participant.handle(), 'deregistered from', row.name, 'but was not on');
+        resolve({ reply: true, event: row, text: 'You were not registered for ' + row.name + ', ' + participant.handle() });
         return;
       }
 
-      p.splice(i, 1);
+      p.splice(index, 1);
       var sql = 'UPDATE Event SET participants = ? WHERE _id = ?';
-      this.db.run(sql, [p.join('/'), id], (err) => {
+      this.db.run(sql, [JSON.stringify(p), id], (err) => {
         if(err) {
           console.log(err);
           reject(err);
           return;
         }
-        console.log(participant, 'deregistered from', row.name);
-        resolve({ reply: true, event: row, text: '@' + participant + ' is no longer registered for ' + row.name });
+        console.log(participant.handle(), 'deregistered from', row.name);
+        resolve({ reply: true, event: row, text: participant.handle() + ' is no longer registered for ' + row.name });
       });
     });
   });
@@ -127,8 +143,8 @@ Event.prototype.removeParticipant = function(id, participant) {
 Event.prototype.delete = function(id, sender) {
   return new Promise((resolve, reject) => {
     this.get(id).then((row) => {
-      if(sender !== row.creator) {
-        console.log(sender, 'tried to delete', row.name);
+      if(!sender.equals(row.creator)) {
+        console.log(sender.fullname, 'tried to delete', row.name);
         reject('permission denied');
         return;
       }
@@ -140,12 +156,11 @@ Event.prototype.delete = function(id, sender) {
           reject(err);
           return;
         }
-        console.log(sender, 'deleted', row.name);
+        console.log(sender.fullname, 'deleted', row.name);
 
-        var msg = row.name + ' was canceled by @' + sender;
-        var p = row.participants ? row.participants.split('/') : [];
-        if(p.length) {
-          msg += '\nParticipants were: ' + p.map((e) => { return '@' + e; }).join(', ');
+        var msg = row.name + ' was canceled by ' + sender.handle();
+        if(row.participants.length) {
+          msg += '\nParticipants were: ' + row.participants.map((p) => { return p.handle(); }).join(', ');
         }
 
         resolve({ reply: true, event: row, text: msg });
@@ -180,6 +195,10 @@ Event.prototype.getAll = function(chatId) {
         reject(err);
         return;
       }
+      for(var i = 0; i < rows.length; i++) {
+        rows[i].creator = new Person(rows[i].creator);
+        rows[i].participants = PersonArray(rows[i].participants);
+      }
       resolve(rows);
     });
   });
@@ -187,13 +206,21 @@ Event.prototype.getAll = function(chatId) {
 
 Event.prototype.getAll2 = function(chatId, creator) {
   return new Promise((resolve, reject) => {
-    var sql = 'SELECT * FROM Event WHERE chatId = ? AND creator = ? ORDER BY date';
-    this.db.all(sql, [chatId, creator], (err, rows) => {
+    var sql = 'SELECT * FROM Event WHERE chatId = ?';
+    this.db.all(sql, [chatId], (err, rows) => {
       if(err) {
         reject(err);
         return;
       }
-      resolve(rows);
+      var result = [];
+      for(var i = 0; i < rows.length; i++) {
+        rows[i].creator = new Person(rows[i].creator);
+        if(rows[i].creator.equals(creator)) {
+          rows[i].participants = PersonArray(rows[i].participants);
+          result.push(rows[i]);
+        }
+      }
+      resolve(result);
     });
   });
 }

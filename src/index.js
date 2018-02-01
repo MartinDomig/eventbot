@@ -8,6 +8,7 @@ const { enter, leave } = Stage;
 const Chrono = require('chrono-node');
 const moment = require('moment');
 const printEvent = require('./printevent');
+const Person = require('./db/person');
 
 process.env.TZ = 'Europe/London';
 
@@ -20,6 +21,9 @@ var shutdown = function() {
 }
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
+process.on('unhandledRejection', error => {
+  console.log(error);
+});
 
 listEvents = function(ctx) {
   if(ctx.message.chat.type !== 'group') {
@@ -37,8 +41,7 @@ listEvents = function(ctx) {
         printEvent(events[i], ctx);
       }
     })
-  })
-  .catch((err) => console.log(err));
+  });
 }
 
 deleteEvents = function(ctx) {
@@ -47,13 +50,8 @@ deleteEvents = function(ctx) {
     return;
   }
 
-  if(!ctx.message.from.username) {
-    ctx.reply('You need to set a telegram username, mate.');
-    return;
-  }
-
   db.deleteOldEvents().then(() => {
-    db.getEvents2(ctx.message.chat.id, ctx.message.from.username).then((events) => {
+    db.getEvents2(ctx.message.chat.id, new Person(ctx.message.from)).then((events) => {
       if(events.length == 0) {
         ctx.reply('You do not have any open events.');
         return;
@@ -63,7 +61,7 @@ deleteEvents = function(ctx) {
 
         var now = moment();
 
-        var msg = event.name + ', organized by ' + event.creator + '\n'
+        var msg = event.name + ', organized by ' + event.creator.fullname + '\n'
           + 'Starts ' + now.to(event.date) + ' (' + moment(event.date).format("dddd MMM Do, h:mm a") + ')\n';
         var keys = undefined;
 
@@ -73,11 +71,10 @@ deleteEvents = function(ctx) {
           msg += 'Registration is CLOSED.';
         }
 
-        var p = event.participants ? event.participants.split('/') : [];
-        if(p.length == 0) {
+        if(event.participants.length == 0) {
           msg += '\nNoone registered.';
         } else {
-          msg += '\n' + p.length + ' Registered: ' + p.join(', ');
+          msg += '\n' + event.participants.length + ' Registered: ' + event.participants.map((p) => { return p.fullname; }).join(', ');
         }
 
         keys = Markup.inlineKeyboard([
@@ -87,48 +84,34 @@ deleteEvents = function(ctx) {
         ctx.reply(msg, keys);
       }
     })
-  })
-  .catch((err) => console.log(err));
+  });
 }
 
 cancelEvent = function(ctx) {
   var id = ctx.match[0];
   id = id.substring(id.indexOf('#') + 1);
-  var sender = ctx.update.callback_query.from.username;
-  if(!sender) {
-    console.log('unknown user clicked on leave', ctx.update.callback_query.from);
-    ctx.reply('You need to set a telegram username, mate.');
-    return;
-  }
+  var sender = new Person(ctx.update.callback_query.from);
   db.Event.delete(id, sender).then((r) => {
     if(r.reply) ctx.reply(r.text);
-  }).catch((err) => console.log(err));
+  });
 }
 
 joinEvent = function(ctx) {
   var id = ctx.match[0];
   id = id.substring(id.indexOf('#') + 1);
-  var sender = ctx.update.callback_query.from.username;
-  if(!sender) {
-    console.log('unknown user clicked on join', ctx.update.callback_query.from);
-    ctx.reply('You need to set a telegram username, mate.');
-    return;
-  }
+  var sender = new Person(ctx.update.callback_query.from);
   db.Event.addParticipant(id, sender).then((r) => {
     if(r.reply) ctx.reply(r.text);
-  }).catch((err) => console.log(err));
+  });
 }
 
 leaveEvent = function(ctx) {
   var id = ctx.match[0];
   id = id.substring(id.indexOf('#') + 1);
-  var sender = ctx.update.callback_query.from.username;
-  if(!sender) {
-    return;
-  }
+  var sender = new Person(ctx.update.callback_query.from);
   db.Event.removeParticipant(id, sender).then((r) => {
     if(r.reply) ctx.reply(r.text);
-  }).catch((err) => console.log(err));
+  });
 }
 
 getHelpText = function() {
@@ -142,19 +125,14 @@ getHelpText = function() {
 
 getStartText = function(ctx) {
   var msg = [];
-  msg.push("Ahoy! I'm a *event bot*. Nice to meet you.");
+  msg.push("Ahoy! I'm an *event bot*. Nice to meet you.");
   msg.push('I can help you organize *events in a group chat*. If you want my help, just add me to your group and start adding events.');
   msg.push('Once I am in your group, you can use the /new or /add command to create a new event for that group. Once the event is created, people can register and deregister by just clicking on a button.');
   msg.push('/list will show all upcoming events, including the registration buttons if the registration deadline did not pass.');
-  msg.push('Each event has a date and a registration deadline. Just before the deadline is reached (~30 minutes), the bot will send out a reminder about this event to the grouop. Once the deadline passed, the bot will mention all registered participants so that everyone can see who registered.');
+  msg.push('Each event has a date and a registration deadline. Just before the deadline is reached (~3 hours), the bot will send out a reminder about this event to the group. Once the deadline passed, the bot will mention all registered participants so that everyone can see who registered.');
   msg.push('To cancel an event, the *creator of that event* can use /cancel or /delete. Registered users will be mentioned in the cancel notification.');
   msg.push('/help gets you a list of available commands');
   msg.push("Now, add me to your group and let's go!");
-
-  if(!ctx.message.from.username) {
-    msg.push("Oh, one more thing: you have to set a telegram user name, otherwise I can't work wit you.");
-  }
-
   return msg.join('\n\n');
 }
 
@@ -163,11 +141,6 @@ startNewEvent = function(ctx) {
     ctx.reply('/new can only be used in a group chat.');
     return;
   }
-  if(!ctx.message.from.username) {
-    ctx.reply('You need to set a telegram username, mate.');
-    return;
-  }
-
   ctx.scene.enter('new-event');
 }
 
@@ -203,22 +176,21 @@ var eventNotifier = function() {
         var event = events[i];
         var flags = event.flags ? event.flags : '';
 
-        if(!flags.includes(1) && now > event.deadline - ONE_HOUR) {
+        if(!flags.includes(1) && now > event.deadline - ONE_HOUR * 3) {
           flags += '1';
           console.log('Sending registration reminder for', event.name);
           printEvent(event, null, bot);
-          bot.telegram.sendMessage(event.chatId, "Registration will CLOSE IN 1 HOUR");
+          bot.telegram.sendMessage(event.chatId, "Registration will CLOSE " + now.to(event.deadline));
         }
 
         if(!flags.includes(2) && now > event.deadline) {
           flags += '2';
 
           var msg = "@" + event.creator + " registration for " + event.name + " is now CLOSED.";
-          var p = event.participants ? event.participants.split('/') : [];
-          if(p.length == 0) {
+          if(event.participants.length == 0) {
             msg += " Nobody registered.";
           } else {
-            msg += "\n" + p.length + " registered: " + p.map((e) => { return '@' + e; }).join(', ');
+            msg += "\n" + event.participants.length + " registered: " + p.map((e) => { return e.handle(); }).join(', ');
           }
           console.log('Sending registration info for', event.name);
           bot.telegram.sendMessage(event.chatId, msg);
@@ -227,10 +199,9 @@ var eventNotifier = function() {
         if(!flags.includes(3) && now > event.date - ONE_MINUTE * 30) {
           flags += '3';
 
-          var p = event.participants ? event.participants.split('/') : [];
-          if(p.length > 0) {
+          if(event.participants.length > 0) {
             var msg = event.name + " will start in 30 minutes, get ready!";
-            msg += "\n" + p.length + " registered: " + p.map((e) => { return '@' + e; }).join(', ');
+            msg += "\n" + p.length + " registered: " + p.map((e) => { e.handle(); }).join(', ');
             console.log('Sending event reminder for', event.name);
             bot.telegram.sendMessage(event.chatId, msg);
           }

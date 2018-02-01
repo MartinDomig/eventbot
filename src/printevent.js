@@ -4,7 +4,7 @@ const moment = require('moment');
 printEvent = function(event, ctx, bot) {
   var now = moment();
 
-  var msg = event.name + ', organized by ' + event.creator + '\n'
+  var msg = event.name + ', organized by ' + event.creator.fullname + '\n'
     + 'Starts ' + now.to(event.date) + ' (' + moment(event.date).format("dddd MMM Do, h:mm a") + ')\n';
   var keys = undefined;
 
@@ -18,11 +18,10 @@ printEvent = function(event, ctx, bot) {
     msg += 'Registration is CLOSED.';
   }
 
-  var p = event.participants ? event.participants.split('/') : [];
-  if(p.length == 0) {
+  if(event.participants.length == 0) {
     msg += '\nNoone registered.';
   } else {
-    msg += '\n' + p.length + ' Registered: ' + p.join(', ');
+    msg += '\n' + event.participants.length + ' Registered: ' + event.participants.map((p) => { return p.fullname }).join(', ');
   }
 
   if(ctx) {
