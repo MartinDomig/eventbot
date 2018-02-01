@@ -3,9 +3,17 @@
 var Person = function(data) {
   var json = data;
   if(typeof(data) === 'string') {
-    json = JSON.parse(data);
+    if(data.startsWith('{')) {
+      json = JSON.parse(data);
+    } else {
+      // backward compatibility: old databases stored users as username only
+      json = {
+        username: data,
+        fullname: data
+      }
+    }
   }
-  
+
   this.username = json.username;
   this.id = json.id;
   if(json.fullname) {

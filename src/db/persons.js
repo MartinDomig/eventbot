@@ -9,7 +9,13 @@ var PersonArray = function(data) {
 
   var json = data;
   if(typeof(data) === 'string') {
-    json = JSON.parse(data);
+    if(data.startsWith('{')) {
+      json = JSON.parse(data);
+    } else {
+      // backward compatibility: old versions stored list of nParticipants
+      // as slash separated list of usernames
+      json = data.split('/');
+    }
   }
 
   var result = [];
