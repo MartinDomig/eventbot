@@ -96,6 +96,8 @@ cancelEvent = function(ctx) {
   id = id.substring(id.indexOf('#') + 1);
   var sender = ctx.update.callback_query.from.username;
   if(!sender) {
+    console.log('unknown user clicked on leave', ctx.update.callback_query.from);
+    ctx.reply('You need to set a telegram username, mate.');
     return;
   }
   db.Event.delete(id, sender).then((r) => {
@@ -108,6 +110,7 @@ joinEvent = function(ctx) {
   id = id.substring(id.indexOf('#') + 1);
   var sender = ctx.update.callback_query.from.username;
   if(!sender) {
+    console.log('unknown user clicked on join', ctx.update.callback_query.from);
     ctx.reply('You need to set a telegram username, mate.');
     return;
   }

@@ -97,7 +97,7 @@ Event.prototype.removeParticipant = function(id, participant) {
     this.get(id).then((row) => {
       if(row.deadline < moment()) {
         console.log(participant, 'tried to deregister from', row.name, 'after deadline');
-        resolve({ reply: true, event: row, text: 'Registration for ' + row.name + ' is closed, @' + participant});
+        resolve({ reply: true, event: row, text: 'Registration for ' + row.name + ' is closed, @' + participant });
         return;
       }
 
@@ -105,7 +105,7 @@ Event.prototype.removeParticipant = function(id, participant) {
       var i = p.indexOf(participant);
       if(i < 0) {
         console.log(participant, 'deregistered from', row.name, 'AGAIN');
-        resolve({ reply: false, event: row, text: 'You were not registered for ' + row.name });
+        resolve({ reply: true, event: row, text: 'You were not registered for ' + row.name + ', @' + participant });
         return;
       }
 
