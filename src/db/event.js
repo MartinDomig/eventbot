@@ -74,7 +74,7 @@ Event.prototype.addParticipant = function(id, participant) {
     this.get(id).then((row) => {
       if(row.deadline < moment()) {
         console.log(participant.handle(), 'tried to register for', row.name, 'after deadline');
-        resolve({ reply: true, event: row, text: 'Registration for ' + row.name + ' is closed, @' + participant});
+        resolve({ reply: true, event: row, text: 'Registration for ' + row.name + ' is closed, ' + participant.handle()});
         return;
       }
 
