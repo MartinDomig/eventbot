@@ -202,7 +202,7 @@ var eventNotifier = function() {
 
           if(event.participants.length > 0) {
             var msg = event.name + " will start " + now.to(event.date) + "!";
-            msg += "\n" + event.participants.length + " registered: " + event.participants.map((e) => { e.handle(); }).join(', ');
+            msg += "\n" + event.participants.length + " registered: " + event.participants.map((e) => { return e.handle(); }).join(', ');
             console.log('Sending event reminder for', event.name);
             bot.telegram.sendMessage(event.chatId, msg);
           }
