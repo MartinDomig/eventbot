@@ -120,6 +120,7 @@ getHelpText = function() {
   msg.push('/list show *upcoming events*');
   msg.push('/delete to cancel events that you created');
   msg.push('/help displays this message');
+  msg.push('/start gives you a description of what I can do');
   return msg.join('\n');
 }
 
@@ -127,12 +128,12 @@ getStartText = function(ctx) {
   var msg = [];
   msg.push("Ahoy! I'm an *event bot*. Nice to meet you.");
   msg.push('I can help you organize *events in a group chat*. If you want my help, just add me to your group and start adding events.');
-  msg.push('Once I am in your group, you can use the /new or /add command to create a new event for that group. Once the event is created, people can register and deregister by just clicking on a button.');
-  msg.push('/list will show all upcoming events, including the registration buttons if the registration deadline did not pass.');
-  msg.push('Each event has a date and a registration deadline. Just before the deadline is reached (~3 hours), the bot will send out a reminder about this event to the group. Once the deadline passed, the bot will mention all registered participants so that everyone can see who registered.');
+  msg.push('Once I am in your group, you can use the /new or /add command to create a new event. Once the event is created, people can easily register and deregister by just clicking on a button.');
+  msg.push('/list will show all upcoming events, including the registration buttons.');
+  msg.push('Each event has a date and a registration deadline. Just before the deadline is reached (~3 hours), the bot will send out a reminder about this event to the group. Once the deadline passed, the bot will no longer accept registrations, so you can make reservations, buy tickets or do whatever preparation needs to be done for your event.');
   msg.push('To cancel an event, the *creator of that event* can use /cancel or /delete. Registered users will be mentioned in the cancel notification.');
   msg.push('/help gets you a list of available commands');
-  msg.push("Now, add me to your group and let's go!");
+  msg.push("Now, `add me to your group` and let's go!");
   return msg.join('\n\n');
 }
 

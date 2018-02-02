@@ -19,7 +19,16 @@ var Person = function(data) {
   if(json.fullname) {
     this.fullname = json.fullname;
   } else if(json.first_name || json.last_name) {
-    this.fullname = json.first_name + ' ' + json.last_name;
+    var a = [];
+    if(json.first_name) {
+      a.push(json.first_name);
+    }
+    if(json.last_name) {
+      a.push(json.last_name);
+    }
+    this.fullname = a.join(' ');
+  } else if(json.username) {
+    this.fullname = json.username;
   }
   this._type = 'Person';
 }
