@@ -187,11 +187,11 @@ var eventNotifier = function() {
         if(!flags.includes(2) && now > event.deadline) {
           flags += '2';
 
-          var msg = "@" + event.creator + " registration for " + event.name + " is now CLOSED.";
+          var msg = event.creator.handle() + " registration for " + event.name + " is now CLOSED.";
           if(event.participants.length == 0) {
             msg += " Nobody registered.";
           } else {
-            msg += "\n" + event.participants.length + " registered: " + p.map((e) => { return e.handle(); }).join(', ');
+            msg += "\n" + event.participants.length + " registered: " + event.participants.map((e) => { return e.handle(); }).join(', ');
           }
           console.log('Sending registration info for', event.name);
           bot.telegram.sendMessage(event.chatId, msg);
@@ -201,8 +201,8 @@ var eventNotifier = function() {
           flags += '3';
 
           if(event.participants.length > 0) {
-            var msg = event.name + " will start in 30 minutes, get ready!";
-            msg += "\n" + p.length + " registered: " + p.map((e) => { e.handle(); }).join(', ');
+            var msg = event.name + " will start " + now.to(event.date) + "!";
+            msg += "\n" + event.participants.length + " registered: " + event.participants.map((e) => { e.handle(); }).join(', ');
             console.log('Sending event reminder for', event.name);
             bot.telegram.sendMessage(event.chatId, msg);
           }
