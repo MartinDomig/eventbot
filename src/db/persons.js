@@ -9,7 +9,7 @@ var PersonArray = function(data) {
 
   var json = data;
   if(typeof(data) === 'string') {
-    if(data.startsWith('{')) {
+    if(data.startsWith('{') || data.startsWith('[')) {
       json = JSON.parse(data);
     } else {
       // backward compatibility: old versions stored list of nParticipants
