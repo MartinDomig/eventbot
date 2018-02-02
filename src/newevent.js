@@ -32,6 +32,10 @@ var NewEvent = function(db) {
       name: ctx.message.text.trim(),
       chatId: ctx.message.chat.id
     }
+    if(event.name.length > 200) {
+      ctx.reply('That name is too long, try again.');
+      return;
+    }
     this.eventMap[key(ctx)] = event;
     ctx.scene.enter('new-event-2');
   });

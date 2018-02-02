@@ -5,11 +5,11 @@ printEvent = function(event, ctx, bot) {
   var now = moment();
 
   var msg = event.name + ', organized by ' + event.creator.fullname + '\n'
-    + 'Starts ' + now.to(event.date) + ' (' + moment(event.date).format("dddd MMM Do, h:mm a") + ')\n';
+    + 'Starts ' + now.to(event.date) + ' (' + moment(event.date).format("dddd MMM Do, h:mm a") + ' GMT)\n';
   var keys = undefined;
 
   if(now < event.deadline) {
-    msg += 'Registration is open until ' + moment(event.deadline).format("dddd MMM Do, h:mm a");
+    msg += 'Registration closes ' + now.to(event.deadline) + ' (' + moment(event.deadline).format("dddd MMM Do, h:mm a") + ' GMT)';
     keys = Markup.inlineKeyboard([
       Markup.callbackButton("I'm in", 'event-in#' + event._id),
       Markup.callbackButton("I'm out", 'event-out#' + event._id)
