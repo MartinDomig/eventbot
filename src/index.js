@@ -101,7 +101,7 @@ openEvent = function(ctx) {
   id = id.substring(id.indexOf('#') + 1);
   var sender = new Person(ctx.update.callback_query.from);
   db.Event.get(id).then((event) => {
-    if(!event.creator.equals(sender)) {
+    if(!event.creator.equals(sender) && sender.id != process.env.OWNER_ID) {
       return;
     }
     var flags = event.flags.replace('C', '');
@@ -118,7 +118,7 @@ closeEvent = function(ctx) {
   id = id.substring(id.indexOf('#') + 1);
   var sender = new Person(ctx.update.callback_query.from);
   db.Event.get(id).then((event) => {
-    if(!event.creator.equals(sender)) {
+    if(!event.creator.equals(sender) && sender.id != process.env.OWNER_ID) {
       return;
     }
     var flags = event.flags + 'C';
@@ -135,7 +135,7 @@ changeDate = function(ctx) {
   id = id.substring(id.indexOf('#') + 1);
   var sender = new Person(ctx.update.callback_query.from);
   db.Event.get(id).then((event) => {
-    if(!event.creator.equals(sender)) {
+    if(!event.creator.equals(sender) && sender.id != process.env.OWNER_ID) {
       return;
     }
     eventMap[sender._id] = event;
@@ -148,7 +148,7 @@ changeDeadline = function(ctx) {
   id = id.substring(id.indexOf('#') + 1);
   var sender = new Person(ctx.update.callback_query.from);
   db.Event.get(id).then((event) => {
-    if(!event.creator.equals(sender)) {
+    if(!event.creator.equals(sender) && sender.id != process.env.OWNER_ID) {
       return;
     }
     eventMap[sender._id] = event;

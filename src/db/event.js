@@ -31,7 +31,6 @@ Event.prototype.create = function(event) {
       sql = 'UPDATE Event SET creator = ?, name = ?, date = ?, deadline = ?, chatId = ? WHERE _id = ?';
       args.push(event._id);
     }
-    console.log(sql, args);
     this.db.run(sql, args, function(err, result) {
       if(err) {
         console.log('error saving event', err);
@@ -153,7 +152,7 @@ Event.prototype.removeParticipant = function(id, participant) {
 Event.prototype.delete = function(id, sender) {
   return new Promise((resolve, reject) => {
     this.get(id).then((row) => {
-      if(!sender.equals(row.creator)) {
+      if(!sender.equals(row.creator) && sender.id != process.env.OWNER_ID) {
         console.log(sender.fullname, 'tried to delete', row.name);
         reject('permission denied');
         return;
@@ -197,11 +196,15 @@ Event.prototype.getAll = function(chatId, person) {
     var sql = 'SELECT * FROM Event WHERE ';
     var args = [];
     if(person && chatId === 0) {
+      if(person.id != process.env.OWNER_ID) {
         sql += 'creator LIKE ?';
         args.push('%"id":' + person.id + '%');
+      } else {
+        sql += '1';
+      }
     } else {
-        sql += 'chatId = ?';
-        args.push(chatId);
+      sql += 'chatId = ?';
+      args.push(chatId);
     }
     this.db.all(sql, args, (err, rows) => {
       if(err) {
