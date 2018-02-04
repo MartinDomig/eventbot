@@ -26,6 +26,10 @@ var NewEvent = function(db, eventMap) {
       name: ctx.message.text.trim(),
       chatId: ctx.message.chat.id
     }
+    if(event.name.length > 200) {
+      ctx.reply('That name is too long, try again.');
+      return;
+    }
     this.eventMap[key(ctx)] = event;
     ctx.scene.enter('new-event-2');
   });
@@ -84,6 +88,7 @@ var NewEvent = function(db, eventMap) {
         return;
       }
       db.createEvent(event).then((id) => {
+        console.log(event.creator.handle(), 'created event', event.name);
         event._id = id;
         printEvent(event, ctx, ctx.telegram, true);
         delete this.eventMap[key(ctx)];
