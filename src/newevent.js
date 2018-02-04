@@ -94,6 +94,7 @@ var NewEvent = function(db) {
         return;
       }
       db.createEvent(event).then((id) => {
+        console.log(event.creator.handle(), 'created event', event.name);
         event._id = id;
         printEvent(event, ctx);
         delete this.eventMap[key(ctx)];
