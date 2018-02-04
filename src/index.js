@@ -174,13 +174,19 @@ leaveEvent = function(ctx) {
   });
 }
 
-getHelpText = function() {
+getHelpText = function(ctx) {
   var msg = [];
-  msg.push('/new create a *new event*');
+  var isGroup = ctx.message.chat.type === 'group';
+  if(isGroup) {
+    msg.push('/new create a *new event*');
+    msg.push('/delete to cancel events that you created');
+  }
   msg.push('/list show *upcoming events*');
-  msg.push('/delete to cancel events that you created');
   msg.push('/help displays this message');
   msg.push('/start gives you a description of what I can do');
+  if(isGroup) {
+    msg.push('You can change your events in a private chat with me.');
+  }
   return msg.join('\n');
 }
 
@@ -219,7 +225,7 @@ bot.command('add', (ctx) => startNewEvent(ctx));
 bot.command('list', (ctx) => listEvents(ctx));
 bot.command('delete', (ctx) => deleteEvents(ctx));
 bot.command('cancel', (ctx) => deleteEvents(ctx));
-bot.command('help', (ctx) => ctx.replyWithMarkdown(getHelpText()));
+bot.command('help', (ctx) => ctx.replyWithMarkdown(getHelpText(ctx)));
 bot.command('start', (ctx) => ctx.replyWithMarkdown(getStartText(ctx)));
 
 bot.action(/event-in#.+/, (ctx) => joinEvent(ctx));
