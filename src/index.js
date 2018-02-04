@@ -14,6 +14,8 @@ process.env.TZ = 'Europe/London';
 
 require('./console_timestamp');
 
+var eventMap = {};
+
 var db = require('./db/db');
 var shutdown = function() {
   db.stop();
@@ -26,32 +28,24 @@ process.on('unhandledRejection', error => {
 });
 
 listEvents = function(ctx) {
-  if(ctx.message.chat.type !== 'group') {
-    ctx.reply('/list can only be used in a group chat.');
-    return;
-  }
-
+  var isGroup = ctx.message.chat.type === 'group';
   db.deleteOldEvents().then(() => {
-    db.getEvents(ctx.message.chat.id).then((events) => {
+    db.getEvents(isGroup ? ctx.message.chat.id : 0, new Person(ctx.message.from)).then((events) => {
       if(events.length == 0) {
         ctx.reply('Nothing going on at the moment. Add a new event with /new.');
         return;
       }
       for(var i = 0; i < events.length; i++) {
-        printEvent(events[i], ctx);
+        printEvent(events[i], ctx, ctx.telegram, isGroup);
       }
     })
   });
 }
 
 deleteEvents = function(ctx) {
-  if(ctx.message.chat.type !== 'group') {
-    ctx.reply('/delete can only be used in a group chat.');
-    return;
-  }
-
   db.deleteOldEvents().then(() => {
-    db.getEvents2(ctx.message.chat.id, new Person(ctx.message.from)).then((events) => {
+    var isGroup = ctx.message.chat.type === 'group';
+    db.getEvents2(isGroup ? ctx.message.chat.id : 0, new Person(ctx.message.from)).then((events) => {
       if(events.length == 0) {
         ctx.reply('You do not have any open events.');
         return;
@@ -92,7 +86,73 @@ cancelEvent = function(ctx) {
   id = id.substring(id.indexOf('#') + 1);
   var sender = new Person(ctx.update.callback_query.from);
   db.Event.delete(id, sender).then((r) => {
-    if(r.reply) ctx.reply(r.text);
+    var isGroup = ctx.update.callback_query.message.chat.type === 'group';
+    if(r.reply) {
+      ctx.reply(r.text);
+      if(!isGroup) {
+        ctx.telegram.sendMessage(r.event.chatId, r.text);
+      }
+    }
+  });
+}
+
+openEvent = function(ctx) {
+  var id = ctx.match[0];
+  id = id.substring(id.indexOf('#') + 1);
+  var sender = new Person(ctx.update.callback_query.from);
+  db.Event.get(id).then((event) => {
+    if(!event.creator.equals(sender)) {
+      return;
+    }
+    var flags = event.flags.replace('C', '');
+    db.Event.setFlags(event._id, flags).then(() => {
+      var msg = event.name + ' registration re-opened by ' + sender.handle();
+      ctx.telegram.sendMessage(event.chatId, msg);
+      ctx.reply(msg);
+    });
+  });
+}
+
+closeEvent = function(ctx) {
+  var id = ctx.match[0];
+  id = id.substring(id.indexOf('#') + 1);
+  var sender = new Person(ctx.update.callback_query.from);
+  db.Event.get(id).then((event) => {
+    if(!event.creator.equals(sender)) {
+      return;
+    }
+    var flags = event.flags + 'C';
+    db.Event.setFlags(event._id, flags).then(() => {
+      var msg = event.name + ' registration closed by ' + sender.handle();
+      ctx.telegram.sendMessage(event.chatId, msg);
+      ctx.reply(msg);
+    });
+  });
+}
+
+changeDate = function(ctx) {
+  var id = ctx.match[0];
+  id = id.substring(id.indexOf('#') + 1);
+  var sender = new Person(ctx.update.callback_query.from);
+  db.Event.get(id).then((event) => {
+    if(!event.creator.equals(sender)) {
+      return;
+    }
+    eventMap[sender._id] = event;
+    ctx.scene.enter('change-date');
+  });
+}
+
+changeDeadline = function(ctx) {
+  var id = ctx.match[0];
+  id = id.substring(id.indexOf('#') + 1);
+  var sender = new Person(ctx.update.callback_query.from);
+  db.Event.get(id).then((event) => {
+    if(!event.creator.equals(sender)) {
+      return;
+    }
+    eventMap[sender._id] = event;
+    ctx.scene.enter('change-deadline');
   });
 }
 
@@ -150,10 +210,10 @@ bot.telegram.getMe().then((botInfo) => { bot.options.username = botInfo.username
 bot.use(session());
 
 var NewEvent = require('./newevent');
-var stages = NewEvent(db);
+var newEventStages = NewEvent(db, eventMap);
+const newEventStage = new Stage(newEventStages, { ttl: 30 });
+bot.use(newEventStage.middleware());
 
-const stage = new Stage(stages, { ttl: 30 });
-bot.use(stage.middleware());
 bot.command('new', (ctx) => startNewEvent(ctx));
 bot.command('add', (ctx) => startNewEvent(ctx));
 bot.command('list', (ctx) => listEvents(ctx));
@@ -166,6 +226,11 @@ bot.action(/event-in#.+/, (ctx) => joinEvent(ctx));
 bot.action(/event-out#.+/, (ctx) => leaveEvent(ctx));
 bot.action(/event-cancel#.+/, (ctx) => cancelEvent(ctx));
 
+bot.action(/open-event#.+/, (ctx) => openEvent(ctx));
+bot.action(/close-event#.+/, (ctx) => closeEvent(ctx));
+bot.action(/change-date#.+/, (ctx) => changeDate(ctx));
+bot.action(/change-deadline#.+/, (ctx) => changeDeadline(ctx));
+
 var eventNotifier = function() {
   const ONE_MINUTE = 1000 * 60;
   const ONE_HOUR = ONE_MINUTE * 60;
@@ -177,15 +242,15 @@ var eventNotifier = function() {
         var event = events[i];
         var flags = event.flags ? event.flags : '';
 
-        if(!flags.includes(1) && now > event.deadline - ONE_HOUR * 3) {
+        if(!flags.includes(1) && !event.isClosed && now > event.deadline - ONE_HOUR * 3) {
           flags += '1';
           console.log('Sending registration reminder for', event.name);
-          printEvent(event, null, bot);
+          printEvent(event, null, bot, true);
           bot.telegram.sendMessage(event.chatId, "Registration will CLOSE " + now.to(event.deadline));
         }
 
-        if(!flags.includes(2) && now > event.deadline) {
-          flags += '2';
+        if(!flags.includes(2) && !event.isClosed && now > event.deadline) {
+          flags += '2C';
 
           var msg = event.creator.handle() + " registration for " + event.name + " is now CLOSED.";
           if(event.participants.length == 0) {

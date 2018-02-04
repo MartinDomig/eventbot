@@ -25,13 +25,22 @@ Event.prototype.createTable = function() {
 Event.prototype.create = function(event) {
   return new Promise((resolve, reject) => {
     var sql = 'INSERT INTO Event (creator, name, date, deadline, chatId) VALUES(?, ?, ?, ?, ?)';
-    this.db.run(sql, [JSON.stringify(event.creator), event.name, event.date, event.deadline, event.chatId], function(err, result) {
+    var args = [JSON.stringify(event.creator), event.name, event.date, event.deadline, event.chatId];
+
+    if(event._id) {
+      sql = 'UPDATE Event SET creator = ?, name = ?, date = ?, deadline = ?, chatId = ? WHERE _id = ?';
+      args.push(event._id);
+    }
+    console.log(sql, args);
+    this.db.run(sql, args, function(err, result) {
       if(err) {
         console.log('error saving event', err);
         reject(err);
         return;
       }
-      event.participants = [];
+      if(!event._id) {
+        event.participants = [];
+      }
       resolve(this.lastID);
     });
   });
@@ -51,6 +60,7 @@ Event.prototype.get = function(id) {
       }
       row.creator = new Person(row.creator);
       row.participants = PersonArray(row.participants);
+      row.isClosed = row.flags && row.flags.includes('C');
       resolve(row);
     });
   });
@@ -182,13 +192,16 @@ Event.prototype.deleteOld = function() {
   });
 }
 
-Event.prototype.getAll = function(chatId) {
+Event.prototype.getAll = function(chatId, person) {
   return new Promise((resolve, reject) => {
-    var sql = 'SELECT * FROM Event';
+    var sql = 'SELECT * FROM Event WHERE ';
     var args = [];
-    if(chatId) {
-      sql = 'SELECT * FROM Event WHERE chatId = ?';
-      args.push(chatId);
+    if(person && chatId === 0) {
+        sql += 'creator LIKE ?';
+        args.push('%"id":' + person.id + '%');
+    } else {
+        sql += 'chatId = ?';
+        args.push(chatId);
     }
     this.db.all(sql, args, (err, rows) => {
       if(err) {
@@ -198,6 +211,7 @@ Event.prototype.getAll = function(chatId) {
       for(var i = 0; i < rows.length; i++) {
         rows[i].creator = new Person(rows[i].creator);
         rows[i].participants = PersonArray(rows[i].participants);
+        rows[i].isClosed = rows[i].flags && rows[i].flags.includes('C');
       }
       resolve(rows);
     });
@@ -206,8 +220,13 @@ Event.prototype.getAll = function(chatId) {
 
 Event.prototype.getAll2 = function(chatId, creator) {
   return new Promise((resolve, reject) => {
-    var sql = 'SELECT * FROM Event WHERE chatId = ?';
-    this.db.all(sql, [chatId], (err, rows) => {
+    var sql = 'SELECT * FROM Event WHERE creator LIKE ? ';
+    var args = ['%"id":' + creator.id + '%'];
+    if(chatId !== 0) {
+        sql += 'AND chatId = ?';
+        args.push(chatId);
+    }
+    this.db.all(sql, args, (err, rows) => {
       if(err) {
         reject(err);
         return;
@@ -215,12 +234,10 @@ Event.prototype.getAll2 = function(chatId, creator) {
       var result = [];
       for(var i = 0; i < rows.length; i++) {
         rows[i].creator = new Person(rows[i].creator);
-        if(rows[i].creator.equals(creator)) {
-          rows[i].participants = PersonArray(rows[i].participants);
-          result.push(rows[i]);
-        }
+        rows[i].participants = PersonArray(rows[i].participants);
+        rows[i].isClosed = rows[i].flags && rows[i].flags.includes('C');
       }
-      resolve(result);
+      resolve(rows);
     });
   });
 }

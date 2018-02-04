@@ -30,8 +30,8 @@ GrumpyDB.prototype.createEvent = function(e) {
   return this.Event.create(e);
 }
 
-GrumpyDB.prototype.getEvents = function(chatId) {
-  return this.Event.getAll(chatId);
+GrumpyDB.prototype.getEvents = function(chatId, person) {
+  return this.Event.getAll(chatId, person);
 }
 
 GrumpyDB.prototype.getEvents2 = function(chatId, creator) {

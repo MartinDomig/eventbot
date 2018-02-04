@@ -8,14 +8,8 @@ const moment = require('moment');
 const printEvent = require('./printevent');
 const Person = require('./db/person');
 
-var NewEvent = function(db) {
-  this.eventMap = {};
-
-  var dateStr = function(d) {
-    return moment(d).format("dddd MMM Do, h:mm a");
-  }
-
-  var cancelKeyboard = Markup.inlineKeyboard([Markup.callbackButton('Cancel', 'cancel')]).extra();
+var NewEvent = function(db, eventMap) {
+  this.eventMap = eventMap;
 
   var key = function(ctx) {
     return '#' + ctx.message.chat.id + '_' + ctx.message.from.id;
@@ -91,7 +85,7 @@ var NewEvent = function(db) {
       }
       db.createEvent(event).then((id) => {
         event._id = id;
-        printEvent(event, ctx);
+        printEvent(event, ctx, ctx.telegram, true);
         delete this.eventMap[key(ctx)];
         ctx.scene.leave();
       }).catch((err) => {
@@ -101,7 +95,73 @@ var NewEvent = function(db) {
     }
   });
 
-  return [newEvent, newEvent2, newEvent3];
+  const chDate = new Scene('change-date');
+  chDate.enter((ctx) => {
+    var p = new Person(ctx.update.callback_query.from);
+    var event = this.eventMap[p._id];
+    ctx.reply("What's the new date for " + event.name + '?');
+  });
+  chDate.on('text', (ctx) => {
+    var p = new Person(ctx.message.from);
+    var event = this.eventMap[p._id];
+    event.date = Chrono.parseDate(ctx.message.text);
+    if(event.date == null) {
+      ctx.reply("I don't understand, try something like 'Saturday 8pm'");
+      return;
+    } else if(event.date < moment()) {
+      delete event.date;
+      ctx.reply("The date must be in the future.");
+      return;
+    } else if(event.date < event.deadline) {
+      delete event.date;
+      ctx.reply("The date must not be before the registration deadline.");
+      return;
+    }
+
+    db.createEvent(event).then(() => {
+      var p = new Person(ctx.message.from);
+      var dateStr = moment(event.date).format("dddd MMM Do, h:mm a");
+      var msg = 'The date for ' + event.name + ' was changed to ' + dateStr + ' by ' + p.handle();
+      ctx.reply(msg);
+      ctx.telegram.sendMessage(event.chatId, msg);
+      ctx.scene.leave();
+    });
+  });
+
+  const chDeadline = new Scene('change-deadline');
+  chDeadline.enter((ctx) => {
+    var p = new Person(ctx.update.callback_query.from);
+    var event = this.eventMap[p._id];
+    ctx.reply("What's the new registration deadline for " + event.name + '?');
+  });
+  chDeadline.on('text', (ctx) => {
+    var p = new Person(ctx.message.from);
+    var event = this.eventMap[p._id];
+    event.deadline = Chrono.parseDate(ctx.message.text);
+    if(event.deadline == null) {
+      ctx.reply("I don't understand, try something like 'Tomorrow 5pm'");
+      return;
+    } else if(event.deadline < moment()) {
+      delete event.deadline;
+      ctx.reply("The deadline must be in the future.");
+      return;
+    } else if(event.date < event.deadline) {
+      delete event.deadline;
+      ctx.reply("The deadline must not be after the date.");
+      return;
+    }
+
+    db.createEvent(event).then(() => {
+      var p = new Person(ctx.message.from);
+      var dateStr = moment(event.deadline).format("dddd MMM Do, h:mm a");
+      var msg = 'The registration deadline for ' + event.name + ' was changed to ' + dateStr + ' by ' + p.handle();
+      ctx.reply(msg);
+      ctx.telegram.sendMessage(event.chatId, msg);
+      ctx.scene.leave();
+    });
+  });
+
+  return [newEvent, newEvent2, newEvent3, chDate, chDeadline];
 }
 
 module.exports = NewEvent;
