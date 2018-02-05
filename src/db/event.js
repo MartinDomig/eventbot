@@ -195,14 +195,21 @@ Event.prototype.getAll = function(chatId, person) {
   return new Promise((resolve, reject) => {
     var sql = 'SELECT * FROM Event WHERE ';
     var args = [];
-    if(person && chatId === 0) {
+    if(typeof(person) === 'undefined' && typeof(chatId) === 'undefined') {
+      // return all events
+      sql += '1';
+    } else if(person && chatId === 0) {
+      // return events for a private chat
       if(person.id != process.env.OWNER_ID) {
+        // private chat not from bot owner
         sql += 'creator LIKE ?';
         args.push('%"id":' + person.id + '%');
       } else {
+        // private chat from bot owner
         sql += '1';
       }
     } else {
+      // get events for a chat
       sql += 'chatId = ?';
       args.push(chatId);
     }
