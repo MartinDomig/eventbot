@@ -56,6 +56,10 @@ var NewEvent = function(db, eventMap) {
         ctx.reply("The date must be in the future, " + p.handle() + ".");
         return;
       }
+      if(event.date.getHours() == 12 && event.date.getMinutes() == 0) {
+        event.date.setHours(19);
+      }
+      console.log(event.date, event.date.getHours(), event.date.getMinutes());
       ctx.scene.enter('new-event-3');
     }
   });
@@ -86,6 +90,9 @@ var NewEvent = function(db, eventMap) {
         delete event.deadline;
         ctx.reply("The deadline cannot be after the event date, " + p.handle() + ".");
         return;
+      }
+      if(event.deadline.getHours() == 12 && event.deadline.getMinutes() == 0) {
+        event.deadline.setHours(19);
       }
       db.createEvent(event).then((id) => {
         console.log(event.creator.handle(), 'created event', event.name);
