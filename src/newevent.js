@@ -8,6 +8,16 @@ const moment = require('moment');
 const printEvent = require('./printevent');
 const Person = require('./db/person');
 
+function parseDate(date) {
+  var ref = new Date();
+  var result = 0;
+  do {
+    result = Chrono.parseDate(date, ref);
+    ref.setDate(ref.getDate() + 1);
+  } while(result < moment());
+  return result;
+}
+
 var NewEvent = function(db, eventMap) {
   this.eventMap = eventMap;
 
@@ -47,7 +57,7 @@ var NewEvent = function(db, eventMap) {
 
     var p = new Person(ctx.message.from);
     if(!event.date) {
-      event.date = Chrono.parseDate(ctx.message.text);
+      event.date = parseDate(ctx.message.text);
       if(event.date == null) {
         ctx.reply("I don't understand, try something like 'Saturday 8pm', " + p.handle() + ".");
         return;
@@ -78,7 +88,7 @@ var NewEvent = function(db, eventMap) {
 
     var p = new Person(ctx.message.from);
     if(!event.deadline) {
-      event.deadline = Chrono.parseDate(ctx.message.text);
+      event.deadline = parseDate(ctx.message.text);
       if(event.deadline == null) {
         ctx.reply("I don't understand, try something like 'Tomorrow 1pm', " + p.handle() + ".");
         return;
@@ -116,7 +126,7 @@ var NewEvent = function(db, eventMap) {
   chDate.on('text', (ctx) => {
     var p = new Person(ctx.message.from);
     var event = this.eventMap[p._id];
-    event.date = Chrono.parseDate(ctx.message.text);
+    event.date = parseDate(ctx.message.text);
     if(event.date == null) {
       ctx.reply("I don't understand, try something like 'Saturday 8pm'");
       return;
@@ -149,7 +159,7 @@ var NewEvent = function(db, eventMap) {
   chDeadline.on('text', (ctx) => {
     var p = new Person(ctx.message.from);
     var event = this.eventMap[p._id];
-    event.deadline = Chrono.parseDate(ctx.message.text);
+    event.deadline = parseDate(ctx.message.text);
     if(event.deadline == null) {
       ctx.reply("I don't understand, try something like 'Tomorrow 5pm'");
       return;

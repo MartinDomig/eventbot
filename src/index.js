@@ -5,7 +5,6 @@ const Scene = require('telegraf/scenes/base');
 const Extra = require('telegraf/extra');
 const Markup = require('telegraf/markup');
 const { enter, leave } = Stage;
-const Chrono = require('chrono-node');
 const moment = require('moment');
 const printEvent = require('./printevent');
 const Person = require('./db/person');
@@ -217,7 +216,7 @@ bot.use(session());
 
 var NewEvent = require('./newevent');
 var newEventStages = NewEvent(db, eventMap);
-const newEventStage = new Stage(newEventStages, { ttl: 30 });
+const newEventStage = new Stage(newEventStages, { ttl: 90 });
 bot.use(newEventStage.middleware());
 
 bot.command('new', (ctx) => startNewEvent(ctx));
@@ -278,6 +277,18 @@ var eventNotifier = function() {
             bot.telegram.sendMessage(event.chatId, msg);
           }
         }
+
+        if(!flags.includes(4) && now > event.date - ONE_MINUTE * 5) {
+          flags += '4';
+
+          if(event.participants.length > 0) {
+            var msg = event.name + " in " + now.to(event.date) + ", get ready!";
+            msg += "\n" + event.participants.length + " registered: " + event.participants.map((e) => { return e.handle(); }).join(', ');
+            console.log('Sending event reminder for', event.name);
+            bot.telegram.sendMessage(event.chatId, msg);
+          }
+        }
+
         db.Event.setFlags(event._id, flags);
       }
     })

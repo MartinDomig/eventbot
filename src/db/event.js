@@ -130,7 +130,7 @@ Event.prototype.removeParticipant = function(id, participant) {
       }
       if(index < 0) {
         console.log(participant.handle(), 'deregistered from', row.name, 'but was not on');
-        resolve({ reply: true, event: row, text: 'You were not registered for ' + row.name + ', ' + participant.handle() });
+        resolve({ reply: true, event: row, text: participant.handle() + " can't make it to " + row.name });
         return;
       }
 
